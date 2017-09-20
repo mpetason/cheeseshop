@@ -35,6 +35,11 @@ class Scraper:
             self.extract_replays()
 
     def _download(self, match):
+        """ Runs a dupe check on the match to make sure it hasn't already been
+            downloaded. Verifies if the match has a demo file, if not it will
+            skip downloading, otherwise it will call download_replay() to
+            download the replay file.
+        """
         match_filename = match.split('/')[-1]
         if self.dupe_check_replays(match_filename):
             print("{} has already been downloaded,"
@@ -50,6 +55,9 @@ class Scraper:
                       ". Demo file not available yet.")
 
     def _list(self, match):
+        """ Lists matches based on the number of --replays. Prints out date,
+            demo file URL, and match title.
+        """
         demo_url = self.get_demo_link(self.format_url(match))
         if demo_url:
             match_meta = [self.get_match_date(self.format_url(match)),
@@ -61,7 +69,8 @@ class Scraper:
         print(match_meta)
 
     def download_replay(self, demo_url, match_url):
-        """ Download replays to ../replays so that we can stage for extracting
+        """ Verifies that the --directory exists, if not create it. Downloads
+            the demo file to the specified directory.
         """
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
@@ -73,13 +82,14 @@ class Scraper:
         print("{} has finished download.".format(local_filename))
 
     def dupe_check_replays(self, filename):
-        """ Check if file exists so that we can skip download if needed. """
+        """ Checks for downloaded match rar files, then returns true or false.
+        """
         replay_file = "{}.rar".format(filename)
         return os.path.isfile(os.path.join(self.directory, replay_file))
 
     def extract_replays(self):
-        """ Extract all .rar files in the specified directory. Skip files that
-            have already been extracted.
+        """ Extracts all rar files in the specified directory. Skips files
+            that have already been extracted.
         """
         for rar in os.listdir(self.directory):
             if not rar.endswith('.rar'):
@@ -140,7 +150,7 @@ def main():
                         help='Extract replay files.')
     parser.add_argument('--list', action='store_true',
                         help='List match details.')
-    parser.add_argument('--directory', action="store", default="../replays/",
+    parser.add_argument('--directory', action="store", required=True,
                         help='Specify custom output directory to store replay'
                              ' files. Can also be used with --extract when'
                              ' extracting already downloaded replays.')
@@ -149,6 +159,7 @@ def main():
     parser.add_argument('--team',
                         help='Team UUID for hltv.org.')
     args = parser.parse_args()
+
     if not (args.team or args.extract):
         parser.error('Please use --team to specify the team, or --extract if '
                      'extracting from directory.')
