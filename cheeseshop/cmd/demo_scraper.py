@@ -4,6 +4,7 @@ import argparse
 import os
 import rarfile
 import datetime
+import hashlib
 
 
 results_url = "https://www.hltv.org/results?team="
@@ -11,14 +12,16 @@ base_url = "https://www.hltv.org"
 
 
 class Scraper:
-    def __init__(self, output_dir, team, replays,
-                 _list=False, _download=False, extract=False):
+    def __init__(self, output_dir, team, replays, upload_url,
+                 _list=False, _download=False, extract=False, upload=False):
         self.directory = output_dir
         self.team = team
         self.replay_count = replays
+        self.upload_url = upload_url
         self.replay_list = _list
         self.download = _download
         self.extract = extract
+        self.upload = upload
         self.matches = []
         if self.download or self.replay_list:
             self.matches = self.get_match(self.team)[:self.replay_count]
@@ -33,6 +36,9 @@ class Scraper:
 
         if self.extract:
             self.extract_replays()
+
+        if self.upload:
+            self.upload_replay()
 
     def _download(self, match):
         """ Runs a dupe check on the match to make sure it hasn't already been
@@ -141,6 +147,26 @@ class Scraper:
             int(match_date[0]) / 1000.0).strftime('%Y-%m-%d')
         return match_timestamp
 
+    def upload_replay(self):
+        demo_hash = hashlib.sha1()
+        for dem in os.listdir(self.directory):
+            if not dem.endswith('.dem'):
+                continue
+            filepath = os.path.join(self.directory, dem)
+            print(filepath)
+            with open(filepath, "rb") as demo:
+                chunk = 0
+                while chunk != b'':
+                    chunk = demo.read(1024)
+                    demo_hash.update(chunk)
+                print(demo_hash.hexdigest())
+                r = requests.post(self.upload_url,
+                                  data={'game': 'cs:go',
+                                        'replay_sha1sum':
+                                        demo_hash.hexdigest(),
+                                        'overwrite': True})
+                print(r.text)
+
 
 def main():
     parser = argparse.ArgumentParser(description='hltv scraper')
@@ -158,14 +184,18 @@ def main():
                         help='Number of replays to download.')
     parser.add_argument('--team',
                         help='Team UUID for hltv.org.')
+    parser.add_argument('--upload', action='store_true',
+                        help="Upload files to swift.")
+    parser.add_argument('--upload_url', action='store',
+                        help="URL for uploading.")
     args = parser.parse_args()
 
-    if not (args.team or args.extract):
+    if not (args.team or args.extract or args.upload):
         parser.error('Please use --team to specify the team, or --extract if '
-                     'extracting from directory.')
+                     'extracting from directory, or --upload if uploading.')
 
     team = args.team
 
-    scraper = Scraper(args.directory, team, args.replays, args.list,
-                      args.download, args.extract)
+    scraper = Scraper(args.directory, team, args.replays, args.upload_url,
+                      args.list, args.download, args.extract, args.upload)
     scraper.run()
