@@ -118,11 +118,7 @@ class App(object):
                     context = {
                         'tempurl': tempurl
                     }
-                    return aiohttp_jinja2.render_template(
-                        'post_upload_tempurl.html',
-                        request,
-                        context
-                    )
+                    return web.json_response({'tempurl': tempurl})
 
         async with self.sql_pool.acquire() as conn:
             async with conn.transaction():

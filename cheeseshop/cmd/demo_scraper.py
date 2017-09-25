@@ -48,16 +48,16 @@ class Scraper:
         """
         match_filename = match.split('/')[-1]
         if self.dupe_check_replays(match_filename):
-            print("{} has already been downloaded,"
+            print("[Skip] {} has already been downloaded,"
                   "skipping.".format(match_filename))
         else:
             demo_url = self.get_demo_link(self.format_url(match))
             if demo_url:
-                print("Downloading {}...".format(match_filename,))
+                print("[Download] Downloading {}...".format(match_filename,))
                 self.download_replay(("{}{}".format(base_url, demo_url)),
-                                     self.format_url(match))
+                                     match, self.format_url(match))
             else:
-                print("Skipping Download for", match.split('/')[-1],
+                print("[Skip] Skipping Download for", match.split('/')[-1],
                       ". Demo file not available yet.")
 
     def _list(self, match):
@@ -74,18 +74,21 @@ class Scraper:
                           "No Demo File Yet", match.split('/')[-1]]
         print(match_meta)
 
-    def download_replay(self, demo_url, match_url):
+    def download_replay(self, demo_url, match, match_url):
         """ Verifies that the --directory exists, if not create it. Downloads
             the demo file to the specified directory.
         """
         if not os.path.exists(self.directory):
             os.makedirs(self.directory)
-        local_filename = "{}.rar".format(match_url.split('/')[-1])
+        match_date = self.get_match_date(self.format_url(match))
+        local_filename = "{}_{}_{}.rar".format(self.team, match_date,
+                                               match_url.split('/')[-1])
         local_filename_location = os.path.join(self.directory, local_filename)
         r = requests.get(demo_url)
         with open(local_filename_location, "wb") as replay:
             replay.write(r.content)
-        print("{} has finished download.".format(local_filename))
+        print("[Download] {} has finished download.".format(local_filename))
+        print("\n")
 
     def dupe_check_replays(self, filename):
         """ Checks for downloaded match rar files, then returns true or false.
@@ -105,10 +108,11 @@ class Scraper:
             for replay_file in opened_rar.infolist():
                 if os.path.isfile(os.path.join(self.directory,
                                   replay_file.filename)):
-                    print("{} already extracted, skipping.".format(
+                    print("[Extract] {} already extracted, skipping.".format(
                           replay_file.filename))
                 else:
-                    print("Extracting {}.".format(replay_file.filename))
+                    print("[Extract] Extracting "
+                          "{}.".format(replay_file.filename))
                     opened_rar.extract(member=replay_file,
                                        path=self.directory)
 
@@ -148,24 +152,42 @@ class Scraper:
         return match_timestamp
 
     def upload_replay(self):
+        """ Upload replay files in specified dirctory. """
         demo_hash = hashlib.sha1()
         for dem in os.listdir(self.directory):
             if not dem.endswith('.dem'):
                 continue
             filepath = os.path.join(self.directory, dem)
-            print(filepath)
             with open(filepath, "rb") as demo:
                 chunk = 0
                 while chunk != b'':
                     chunk = demo.read(1024)
                     demo_hash.update(chunk)
-                print(demo_hash.hexdigest())
+                print("[Check] if {} already exists.".format(dem))
                 r = requests.post(self.upload_url,
                                   data={'game': 'cs:go',
                                         'replay_sha1sum':
-                                        demo_hash.hexdigest(),
-                                        'overwrite': True})
-                print(r.text)
+                                        demo_hash.hexdigest()
+                                        })
+                if r.text == "Replay sha1 already exists":
+                    temp_url = ""
+                    print("[Skip] {}. {}.".format(dem, r.text))
+                else:
+                    temp_url = r.json()['tempurl']
+                    print("[Tempurl] Swift tempurl created for"
+                          "{}.".format(dem))
+                demo_file = {'upload_file': open(filepath, "rb")}
+                if not temp_url == "":
+                    print("[Upload] Uploading {} to swift.".format(dem))
+                    upload = requests.put(temp_url, files=demo_file)
+                    if upload.status_code == 201:
+                        print("[Upload] Upload for {} succeeded.".format(dem))
+                        print("\n")
+                    else:
+                        print("[Upload] Upload for {} was not"
+                              "successful.".format(dem))
+                        print("[Error] {}".format(upload.status_code))
+                        print("\n")
 
 
 def main():
