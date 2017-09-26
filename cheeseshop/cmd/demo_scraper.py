@@ -48,17 +48,16 @@ class Scraper:
         """
         match_filename = match.split('/')[-1]
         if self.dupe_check_replays(match_filename):
-            print("[Skip] {} has already been downloaded,"
-                  "skipping.".format(match_filename))
+            print("Skipping {}, file already exists.".format(match_filename))
         else:
             demo_url = self.get_demo_link(self.format_url(match))
             if demo_url:
-                print("[Download] Downloading {}...".format(match_filename,))
+                print("Downloading {}...".format(match_filename,))
                 self.download_replay(("{}{}".format(base_url, demo_url)),
                                      match, self.format_url(match))
             else:
-                print("[Skip] Skipping Download for", match.split('/')[-1],
-                      ". Demo file not available yet.")
+                print("Skipping Download for {}. "
+                      "Demo file not available.".format(match.split('/')[-1]))
 
     def _list(self, match):
         """ Lists matches based on the number of --replays. Prints out date,
@@ -87,8 +86,7 @@ class Scraper:
         r = requests.get(demo_url)
         with open(local_filename_location, "wb") as replay:
             replay.write(r.content)
-        print("[Download] {} has finished download.".format(local_filename))
-        print("\n")
+        print("{} has finished download.".format(local_filename))
 
     def dupe_check_replays(self, filename):
         """ Checks for downloaded match rar files, then returns true or false.
@@ -108,11 +106,10 @@ class Scraper:
             for replay_file in opened_rar.infolist():
                 if os.path.isfile(os.path.join(self.directory,
                                   replay_file.filename)):
-                    print("[Extract] {} already extracted, skipping.".format(
+                    print("{} has already been extracted, skipping.".format(
                           replay_file.filename))
                 else:
-                    print("[Extract] Extracting "
-                          "{}.".format(replay_file.filename))
+                    print("Extracting {}.".format(replay_file.filename))
                     opened_rar.extract(member=replay_file,
                                        path=self.directory)
 
@@ -163,7 +160,7 @@ class Scraper:
                 while chunk != b'':
                     chunk = demo.read(1024)
                     demo_hash.update(chunk)
-                print("[Check] if {} already exists.".format(dem))
+                print("Checking if {} has already been uploaded.".format(dem))
                 r = requests.post(self.upload_url,
                                   data={'game': 'cs:go',
                                         'replay_sha1sum':
@@ -171,23 +168,19 @@ class Scraper:
                                         })
                 if r.text == "Replay sha1 already exists":
                     temp_url = ""
-                    print("[Skip] {}. {}.".format(dem, r.text))
+                    print("Skipping {}. Sha1 already exists.".format(dem))
                 else:
                     temp_url = r.json()['tempurl']
-                    print("[Tempurl] Swift tempurl created for"
-                          "{}.".format(dem))
                 demo_file = {'upload_file': open(filepath, "rb")}
                 if not temp_url == "":
-                    print("[Upload] Uploading {} to swift.".format(dem))
+                    print("Uploading {} to swift.".format(dem))
                     upload = requests.put(temp_url, files=demo_file)
                     if upload.status_code == 201:
-                        print("[Upload] Upload for {} succeeded.".format(dem))
-                        print("\n")
+                        print("Upload for {} succeeded.".format(dem))
                     else:
-                        print("[Upload] Upload for {} was not"
+                        print("[Upload for {} was not "
                               "successful.".format(dem))
-                        print("[Error] {}".format(upload.status_code))
-                        print("\n")
+                        print("Error: {}".format(upload.status_code))
 
 
 def main():
