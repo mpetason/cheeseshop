@@ -67,7 +67,8 @@ class Scraper:
         if demo_url:
             match_meta = [self.get_match_date(self.format_url(match)),
                           "{}{}".format(base_url, demo_url),
-                          match.split('/')[-1]]
+                          match.split('/')[-1],
+                          self.get_match_teams(self.format_url(match))]
         else:
             match_meta = [self.get_match_date(self.format_url(match)),
                           "No Demo File Yet", match.split('/')[-1]]
@@ -148,6 +149,15 @@ class Scraper:
             int(match_date[0]) / 1000.0).strftime('%Y-%m-%d')
         return match_timestamp
 
+    def get_match_teams(self, url):
+        match_page = requests.get(url)
+        match_tree = html.fromstring(match_page.content)
+        team1 = match_tree.xpath('//div[@class="team1-gradient"]/following'
+                                 '::div[@class="teamName"]/text()')
+        team2 = match_tree.xpath('//div[@class="team2-gradient"/following'
+                                 '::div[@class="teamName"]]/text()')
+        return {'team1': team1, 'team2': team2}
+
     def upload_replay(self):
         """ Upload replay files in specified dirctory. """
         demo_hash = hashlib.sha1()
@@ -205,7 +215,7 @@ def main():
                         help="URL for uploading.")
     args = parser.parse_args()
 
-    if not (args.team or args.extract or args.upload):
+    if not (args.team or args.extract or args.upload or args.list):
         parser.error('Please use --team to specify the team, or --extract if '
                      'extracting from directory, or --upload if uploading.')
 
